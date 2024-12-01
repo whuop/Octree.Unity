@@ -1,4 +1,4 @@
-using System.Collections;
+/*using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,7 +6,7 @@ namespace Octree.Unity
 {
     public class OctreeBridge : MonoBehaviour
     {
-        [SerializeField] Octree LinkedOctree;
+        [SerializeField] Octree_Old LinkedOctree;
 
         public void On3DBoundsCalculated(Bounds InBounds)
         {
@@ -34,3 +34,4 @@ namespace Octree.Unity
         }
     }
 }
+*/

@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using Octree.Unity.Samples;
 using UnityEngine;
-
+/*
 namespace Octree.Unity
 {
     public class Player3D : MonoBehaviour
     {
-        [SerializeField] Octree LinkedOctree;
+        //[SerializeField] Octree_Old LinkedOctree;
         [SerializeField] float ObstacleSearchRange = 30f;
 
         Vector3 CachedPosition = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
@@ -88,4 +88,4 @@ namespace Octree.Unity
             (RemovedObstacle as Obstacle).RemoveHighlight();
         }
     }
-}
+}*/

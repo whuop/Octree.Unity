@@ -1,219 +1,141 @@
-#define OCTREE_PROFILE
-
-using System.Collections.Generic;
-using Unity.Profiling;
+using System;
+using System.Runtime.InteropServices;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 namespace Octree.Unity
 {
-    public class Octree : MonoBehaviour
+    public class Octree
     {
-        class Node
+        private NativeList<Node> m_nodes;
+        private int m_nodesIndex = 0;
+        
+        private int m_maxDataPerNode;
+        private int m_minimumNodeSize;
+        
+        public Octree(int maxDataPerNode, int minimumNodeSize, Bounds bounds)
         {
-            private Bounds m_nodeBounds;
-            private Node[] m_children;
-            private int m_depth;
+            m_maxDataPerNode = maxDataPerNode;
+            m_minimumNodeSize = minimumNodeSize;
 
-            private HashSet<ISpatialData3D> m_data;
+            m_nodes = new NativeList<Node>(Allocator.Persistent);
+            AddNode(new Node(bounds));
+        }
 
-            public Node(Bounds inBounds, int inDepth = 0)
+        public unsafe void AddData<T>(T spatialData) where T : struct, ISpatialData3D
+        {
+            IntPtr ptr = new IntPtr();
+            Marshal.StructureToPtr(spatialData, ptr, false);
+            UntypedInstanceData data = new UntypedInstanceData(ptr.ToPointer());
+            // Add to root node, and handle from there
+            AddData(0, data);
+        }
+
+        private void AddData(int nodeIndex, UntypedInstanceData spatialData)
+        {
+            var parentNode = m_nodes[nodeIndex];
+            if (parentNode.ChildCount == 0)
             {
-                m_nodeBounds = inBounds;
-                m_depth = inDepth;
-            }
-
-            public void AddData(Octree owner, ISpatialData3D spatialData)
-            {
-                if (m_children == null)
-                {
-                    //  Is this the first we're adding data to this node?
-                    if (m_data == null)
-                        m_data = new();
-                    
-                    //  Should we split AND are we able to split?
-                    if ((m_data.Count + 1) >= owner.PreferredMaxDataPerNode && CanSplit(owner))
-                    {
-                        SplitNode(owner);
-                        AddDataToChildren(owner, spatialData);
-                    }
-                    else
-                    {
-                        m_data.Add(spatialData);
-                    }
-                    return;
-                }
-
-                AddDataToChildren(owner, spatialData);
-            }
-
-            private void SplitNode(Octree owner)
-            {
-                //  Extents is half size of nodebounds, therefore perfect fit for subdivision.
-                Vector3 childSize = m_nodeBounds.extents;
-                Vector3 offset = childSize / 2f;
-                int newDepth = m_depth + 1;
-#if OCTREE_PROFILE
-                OctreeProfiler.NodeCount.Value += 8;
-                OctreeProfiler.MaxDepth.Value = Mathf.Max(newDepth, OctreeProfiler.MaxDepth.Value);
-#endif
-
-                // 8 children, the Oc in Octree.
-                m_children = new Node[8]
-                {
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3(-offset.x, -offset.y,  offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3( offset.x, -offset.y,  offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3(-offset.x, -offset.y, -offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3( offset.x, -offset.y, -offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3(-offset.x,  offset.y,  offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3( offset.x,  offset.y,  offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3(-offset.x,  offset.y, -offset.z), childSize), newDepth),
-                    new Node(new Bounds(m_nodeBounds.center + new Vector3( offset.x,  offset.y, -offset.z), childSize), newDepth),
-                };
-
-                foreach (var data3D in m_data)
-                {
-                    AddDataToChildren(owner, data3D);
-                }
-
-                m_data = null;
-            }
-
-            void AddDataToChildren(Octree owner, ISpatialData3D spatialData)
-            {
-                foreach (var child in m_children)
-                {
-                    if (child.Overlaps(spatialData.GetBounds()))
-                        child.AddData(owner, spatialData);
-                }
-            }
-
-            private bool Overlaps(Bounds other)
-            {
-                return m_nodeBounds.Intersects(other);
-            }
-
-            private bool CanSplit(Octree owner)
-            {
-                return m_nodeBounds.size.x >= owner.MinimumNodeSize &&
-                       m_nodeBounds.size.y >= owner.MinimumNodeSize &&
-                       m_nodeBounds.size.z >= owner.MinimumNodeSize;
-            }
-
-            public void FindDataInBox(Bounds searchBounds, HashSet<ISpatialData3D> foundData, bool exactBounds)
-            {
-                if (m_children == null)
-                {
-                    if (m_data == null || m_data.Count == 0)
-                        return;
-
-                    //  Optimized check for a root node with no children
-                    if (m_depth == 0 && exactBounds)
-                    {
-                        foreach (var spatialData in m_data)
-                        {
-                            if (searchBounds.Intersects(spatialData.GetBounds()))
-                                foundData.Add(spatialData);
-                        }
-                    }
-                    
-                    foundData.UnionWith(m_data);
-                    return;
-                }
-
-                foreach (var child in m_children)
-                {
-                    if (child.Overlaps(searchBounds))
-                        child.FindDataInBox(searchBounds, foundData, exactBounds);
-                }
-
-                //  If we're on the root node filter out spatial data not within search bounds.
-                if (m_depth == 0 && exactBounds)
-                {
-                    foundData.RemoveWhere(spatialData => !searchBounds.Intersects(spatialData.GetBounds()));
-                }
-            }
-            
-            public void FindDataInRange(Vector3 searchLocation, float searchRange, HashSet<ISpatialData3D> foundData, bool exactBounds)
-            {
-                if (m_depth != 0)
-                {
-                    throw new System.InvalidOperationException(
-                        "FindDataInRange cannot be run on anything other than the root node!");
-                }
-
-                Bounds searchBounds = new Bounds(searchLocation, searchRange * Vector3.one * 2f);
+                // Is this the first time we're adding data to this node?
+                if (!parentNode.Data.IsCreated)
+                    parentNode.Data = new NativeHashSet<UntypedInstanceData>(0, Allocator.Persistent);
                 
-                FindDataInBox(searchBounds, foundData, exactBounds);
-
-                foundData.RemoveWhere(spatialData =>
+                //  Should we split, and are we able to split?
+                if ((parentNode.Data.Count + 1) >= m_maxDataPerNode && CanSplit())
                 {
-                    float testRange = searchRange + spatialData.GetRadius();
-                    return (searchLocation - spatialData.GetLocation()).sqrMagnitude > (testRange * testRange);
-                });
+                    SplitNode();
+                    AddDataToChildren(spatialData);
+                }
+                else
+                {
+                    parentNode.Data.Add(spatialData);
+                }
+
+                return;
             }
+
+            AddDataToChildren(spatialData);
+            m_nodes[nodeIndex] = parentNode;
         }
 
-        [field: SerializeField] 
-        public int PreferredMaxDataPerNode { get; private set; } = 50;
-        [field: SerializeField] 
-        public int MinimumNodeSize { get; private set; } = 5;
+        private void SplitNode()
+        {
+            
+        }
+
+        private void AddNode(Node node)
+        {
+            m_nodes[m_nodesIndex] = node;
+            m_nodesIndex++;
+        }
         
-        private Node m_rootNode;
-        
-        public void PrepareTree(Bounds inBounds)
+        public static bool IsBoxed<T>(T value)
         {
-            m_rootNode = new Node(inBounds);
-#if OCTREE_PROFILE
-            OctreeProfiler.MaxDepth.Value = 0;
-            OctreeProfiler.NodeCount.Value = 1;
-#endif
+            return 
+                (typeof(T).IsInterface || typeof(T) == typeof(object)) &&
+                value != null &&
+                value.GetType().IsValueType;
         }
+    }
 
-        public void AddData(ISpatialData3D data)
-        {
-            m_rootNode.AddData(this, data);
-        }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Node
+    {
+        public Bounds Bounds;
+        public int ChildCount;
+        public int Depth;
+        public NativeHashSet<UntypedInstanceData> Data;
 
-        public void AddData(List<ISpatialData3D> data)
+        public Node(Bounds bounds, int depth = 0)
         {
-            foreach (var data3D in data)
-            {
-                AddData(data3D);
-            }
-        }
-
-        public HashSet<ISpatialData3D> FindDataInRange(Vector3 searchLocation, float searchRange)
-        {
-#if OCTREE_PROFILE
-            var stopwatch = new System.Diagnostics.Stopwatch();
-            stopwatch.Start();
-#endif
-            
-            HashSet<ISpatialData3D> foundData = new();
-            m_rootNode.FindDataInRange(searchLocation, searchRange, foundData);
-#if OCTREE_PROFILE
-            stopwatch.Stop();
-            OctreeProfiler.LastQueryMS.Sample(stopwatch.ElapsedMilliseconds);
-            OctreeProfiler.LastQueryResultCount.Sample(foundData.Count);
-#endif
-            
-            
-            return foundData;
+            Bounds = bounds;
+            Depth = depth;
+            ChildCount = 0;
+            Data = default;
         }
     }
     
-#if OCTREE_PROFILE
-    class OctreeProfiler
+    public unsafe struct UntypedInstanceData : IEquatable<UntypedInstanceData>
     {
-        public static readonly ProfilerCategory Category = new ProfilerCategory("Octree");
-        public static readonly ProfilerCounterValue<int> NodeCount =
-            new ProfilerCounterValue<int>(Category, "Node Count", ProfilerMarkerDataUnit.Count);
-        public static readonly ProfilerCounterValue<int> MaxDepth =
-            new ProfilerCounterValue<int>(Category, "Max Depth", ProfilerMarkerDataUnit.Count);
-        public static readonly ProfilerCounter<float> LastQueryMS =
-            new ProfilerCounter<float>(Category, "Last Query MS", ProfilerMarkerDataUnit.Undefined);
-        public static readonly ProfilerCounter<float> LastQueryResultCount =
-            new ProfilerCounter<float>(Category, "Last Query Result", ProfilerMarkerDataUnit.Count);
+        [NativeDisableUnsafePtrRestriction]
+        internal void* m_ptr;
+
+        public UntypedInstanceData(void* ptr)
+        {
+            m_ptr = ptr;
+        }
+
+        public T Resolve<T>() where T: unmanaged
+        {
+            T* resolved = (T*)m_ptr;
+            return *resolved;
+        }
+
+        public bool IsValid => m_ptr != null;
+
+        [System.Diagnostics.Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        private void CheckNull()
+        {
+            if (m_ptr == null)
+                throw new System.NullReferenceException("Unable to resolve UntypedInstanceData because its internal data was either zero-sized or not initialized");
+        }
+
+        public bool Equals(UntypedInstanceData other)
+        {
+            return m_ptr == other.m_ptr;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is UntypedInstanceData other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return unchecked((int)(long)m_ptr);
+        }
     }
-#endif
 }
+
+

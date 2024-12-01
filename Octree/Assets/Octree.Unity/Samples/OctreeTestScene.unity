@@ -227,8 +227,6 @@ GameObject:
   - component: {fileID: 456346720}
   - component: {fileID: 456346719}
   - component: {fileID: 456346723}
-  - component: {fileID: 456346724}
-  - component: {fileID: 456346725}
   m_Layer: 0
   m_Name: Spawner
   m_TagString: Untagged
@@ -337,7 +335,7 @@ MonoBehaviour:
   Mode: 1
   PrefabToSpawn: {fileID: 1177600678175634779, guid: d8b2c384f15a17c4bbc536447fc55c14,
     type: 3}
-  NumToSpawn: 20000
+  NumToSpawn: 1000
   SpawnZone: {fileID: 456346718}
   MinRadius: 0.5
   MaxRadius: 2
@@ -346,64 +344,13 @@ MonoBehaviour:
       m_Calls: []
   On3DBoundsCalculated:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 456346725}
-        m_TargetAssemblyTypeName: Octree.Unity.OctreeBridge, Assembly-CSharp
-        m_MethodName: On3DBoundsCalculated
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
   OnItemSpawned:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 456346725}
-        m_TargetAssemblyTypeName: Octree.Unity.OctreeBridge, Assembly-CSharp
-        m_MethodName: OnItemSpawned
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
   OnAllItemsSpawned:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &456346724
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 456346718}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ecdc839a353306d4599942ef9d111117, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  <PreferredMaxDataPerNode>k__BackingField: 50
-  <MinimumNodeSize>k__BackingField: 5
---- !u!114 &456346725
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 456346718}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5dee6eaa06aa94a44af8cf1f969c34df, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  LinkedOctree: {fileID: 456346724}
 --- !u!1 &805815337
 GameObject:
   m_ObjectHideFlags: 0
@@ -531,7 +478,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1827352701}
-  - component: {fileID: 1827352702}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -554,20 +500,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1827352702
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1827352700}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b1539147d3b248b47ac1e2ee0a1bba88, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  LinkedOctree: {fileID: 456346724}
-  ObstacleSearchRange: 15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
