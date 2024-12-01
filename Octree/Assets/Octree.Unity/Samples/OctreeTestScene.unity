@@ -337,7 +337,7 @@ MonoBehaviour:
   Mode: 1
   PrefabToSpawn: {fileID: 1177600678175634779, guid: d8b2c384f15a17c4bbc536447fc55c14,
     type: 3}
-  NumToSpawn: 1000
+  NumToSpawn: 20000
   SpawnZone: {fileID: 456346718}
   MinRadius: 0.5
   MaxRadius: 2
@@ -567,7 +567,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   LinkedOctree: {fileID: 456346724}
-  ObstacleSearchRange: 2
+  ObstacleSearchRange: 15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

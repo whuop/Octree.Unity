@@ -30,7 +30,7 @@ namespace Octree.Unity
 
             //LinkedOctree.AddData(SpatialItems);
 
-            LinkedOctree.ShowStats();
+            //LinkedOctree.ShowStats();
         }
     }
 }

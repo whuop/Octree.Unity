@@ -1,4 +1,7 @@
+#define OCTREE_PROFILE
+
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace Octree.Unity
@@ -49,6 +52,10 @@ namespace Octree.Unity
                 Vector3 childSize = m_nodeBounds.extents;
                 Vector3 offset = childSize / 2f;
                 int newDepth = m_depth + 1;
+#if OCTREE_PROFILE
+                OctreeProfiler.NodeCount.Value += 8;
+                OctreeProfiler.MaxDepth.Value = Mathf.Max(newDepth, OctreeProfiler.MaxDepth.Value);
+#endif
 
                 // 8 children, the Oc in Octree.
                 m_children = new Node[8]
@@ -92,12 +99,22 @@ namespace Octree.Unity
                        m_nodeBounds.size.z >= owner.MinimumNodeSize;
             }
 
-            public void FindDataInBox(Bounds searchBounds, HashSet<ISpatialData3D> foundData)
+            public void FindDataInBox(Bounds searchBounds, HashSet<ISpatialData3D> foundData, bool exactBounds)
             {
                 if (m_children == null)
                 {
                     if (m_data == null || m_data.Count == 0)
                         return;
+
+                    //  Optimized check for a root node with no children
+                    if (m_depth == 0 && exactBounds)
+                    {
+                        foreach (var spatialData in m_data)
+                        {
+                            if (searchBounds.Intersects(spatialData.GetBounds()))
+                                foundData.Add(spatialData);
+                        }
+                    }
                     
                     foundData.UnionWith(m_data);
                     return;
@@ -106,11 +123,17 @@ namespace Octree.Unity
                 foreach (var child in m_children)
                 {
                     if (child.Overlaps(searchBounds))
-                        child.FindDataInBox(searchBounds, foundData);
+                        child.FindDataInBox(searchBounds, foundData, exactBounds);
+                }
+
+                //  If we're on the root node filter out spatial data not within search bounds.
+                if (m_depth == 0 && exactBounds)
+                {
+                    foundData.RemoveWhere(spatialData => !searchBounds.Intersects(spatialData.GetBounds()));
                 }
             }
             
-            public void FindDataInRange(Vector3 searchLocation, float searchRange, HashSet<ISpatialData3D> foundData)
+            public void FindDataInRange(Vector3 searchLocation, float searchRange, HashSet<ISpatialData3D> foundData, bool exactBounds)
             {
                 if (m_depth != 0)
                 {
@@ -119,9 +142,14 @@ namespace Octree.Unity
                 }
 
                 Bounds searchBounds = new Bounds(searchLocation, searchRange * Vector3.one * 2f);
+                
+                FindDataInBox(searchBounds, foundData, exactBounds);
 
-
-                FindDataInBox(searchBounds, foundData);
+                foundData.RemoveWhere(spatialData =>
+                {
+                    float testRange = searchRange + spatialData.GetRadius();
+                    return (searchLocation - spatialData.GetLocation()).sqrMagnitude > (testRange * testRange);
+                });
             }
         }
 
@@ -135,6 +163,10 @@ namespace Octree.Unity
         public void PrepareTree(Bounds inBounds)
         {
             m_rootNode = new Node(inBounds);
+#if OCTREE_PROFILE
+            OctreeProfiler.MaxDepth.Value = 0;
+            OctreeProfiler.NodeCount.Value = 1;
+#endif
         }
 
         public void AddData(ISpatialData3D data)
@@ -150,17 +182,38 @@ namespace Octree.Unity
             }
         }
 
-        public void ShowStats()
-        {
-            
-        }
-
         public HashSet<ISpatialData3D> FindDataInRange(Vector3 searchLocation, float searchRange)
         {
+#if OCTREE_PROFILE
+            var stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+#endif
+            
             HashSet<ISpatialData3D> foundData = new();
             m_rootNode.FindDataInRange(searchLocation, searchRange, foundData);
+#if OCTREE_PROFILE
+            stopwatch.Stop();
+            OctreeProfiler.LastQueryMS.Sample(stopwatch.ElapsedMilliseconds);
+            OctreeProfiler.LastQueryResultCount.Sample(foundData.Count);
+#endif
+            
             
             return foundData;
         }
     }
+    
+#if OCTREE_PROFILE
+    class OctreeProfiler
+    {
+        public static readonly ProfilerCategory Category = new ProfilerCategory("Octree");
+        public static readonly ProfilerCounterValue<int> NodeCount =
+            new ProfilerCounterValue<int>(Category, "Node Count", ProfilerMarkerDataUnit.Count);
+        public static readonly ProfilerCounterValue<int> MaxDepth =
+            new ProfilerCounterValue<int>(Category, "Max Depth", ProfilerMarkerDataUnit.Count);
+        public static readonly ProfilerCounter<float> LastQueryMS =
+            new ProfilerCounter<float>(Category, "Last Query MS", ProfilerMarkerDataUnit.Undefined);
+        public static readonly ProfilerCounter<float> LastQueryResultCount =
+            new ProfilerCounter<float>(Category, "Last Query Result", ProfilerMarkerDataUnit.Count);
+    }
+#endif
 }
